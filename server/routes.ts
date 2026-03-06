@@ -36,7 +36,7 @@ export async function registerRoutes(
       const imageDescriptions: string[] = [];
 
       if (imageFiles && imageFiles.length > 0) {
-        const visionModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const visionModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
         for (const file of imageFiles) {
           const base64 = file.buffer.toString("base64");
@@ -58,7 +58,7 @@ export async function registerRoutes(
         ? `\n\nThe client provided ${imageDescriptions.length} reference image(s) with these visual characteristics:\n${imageDescriptions.map((d, i) => `Image ${i+1}: ${d}`).join("\n")}\n\nMatch the tone and energy of these visuals in your writing style.`
         : "";
 
-      const textModel = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+      const textModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
       const systemPrompt = `System Role: You are an Expert Brand Strategist, Master Copywriter, and Visual Art Director. Your goal is to distill raw conversations and visual assets into a cohesive, highly authentic brand identity.
 
@@ -153,7 +153,7 @@ ${styleContext}`;
       if (sections.imagePrompt) {
         try {
           console.log("Generating image with Gemini...");
-          const imageModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash-preview-image-generation" });
+          const imageModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp-image-generation" });
 
           const imageResult = await imageModel.generateContent({
             contents: [{
