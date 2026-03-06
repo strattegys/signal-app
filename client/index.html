@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+
+    <meta property="og:title" content="signal-in-crisis" />
+    <meta property="og:description" content="The B2B Marketing AI — Out of Credits" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://replit.com/public/images/opengraph.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@replit" />
+    <meta name="twitter:title" content="signal-in-crisis" />
+    <meta name="twitter:description" content="The B2B Marketing AI — Out of Credits" />
+    <meta name="twitter:image" content="https://replit.com/public/images/opengraph.png" />
+
+    <title>signal-in-crisis</title>
+
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script src="https://cdn.jsdelivr.net/gh/VapiAI/html-script-tag@latest/dist/assets/index.js"></script>
+    <script>
+      window.addEventListener("load", () => {
+        if (window.vapiSDK) {
+          window.vapiSDK.run({
+            apiKey: "377373fd-1172-48de-80f3-19e872d55f11",
+            assistant: "4e1824a3-84a6-42c3-a16f-956833df5b49",
+            config: {
+              position: "bottom-right",
+              theme: {
+                primary: "#1f2937",
+                secondary: "#ffffff"
+              },
+              title: "B2B Influencer Agent"
+            }
+          });
+
+          // ✅ Force floating on the real root container
+          const style = document.createElement('style');
+          style.innerHTML = `
+            #vapi-widget-root {
+              position: fixed !important;
+              bottom: 40px !important;
+              right: 40px !important;
+              left: auto !important;
+              top: auto !important;
+              z-index: 999999 !important;
+            }
+            .vapi-btn {
+              position: fixed !important;
+              bottom: 40px !important;
+              right: 40px !important;
+              z-index: 999999 !important;
+              transform: scale(1.5) !important;
+              transform-origin: bottom right !important;
+            }
+          `;
+          document.head.appendChild(style);
+
+          const interval = setInterval(() => {
+            const root = document.querySelector('#vapi-widget-root');
+            if (root) {
+              root.style.setProperty('position', 'fixed', 'important');
+              root.style.setProperty('bottom', '40px', 'important');
+              root.style.setProperty('right', '40px', 'important');
+              root.style.setProperty('z-index', '999999', 'important');
+            }
+          }, 1000);
+        }
+      });
+    </script>
+  </body>
+</html>
