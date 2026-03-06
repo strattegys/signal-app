@@ -1,16 +1,12 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import PDFDocument from "pdfkit";
 
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }
-});
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
 });
 
 export async function registerRoutes(
@@ -24,9 +20,11 @@ export async function registerRoutes(
       const transcriptFile = files?.["transcriptFile"]?.[0];
       const imageFiles = files?.["images"];
 
-      if (!process.env.OPENAI_API_KEY) {
-        return res.status(503).json({ error: "AI service is not configured. Please set up the OpenAI integration." });
+      if (!process.env.GEMINI_API_KEY) {
+        return res.status(503).json({ error: "AI service is not configured. Please set up the GEMINI_API_KEY environment variable." });
       }
+
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
       let transcript = "";
       if (transcriptFile) {
@@ -36,27 +34,20 @@ export async function registerRoutes(
       }
 
       const imageDescriptions: string[] = [];
-      const imageBuffers: Buffer[] = [];
 
       if (imageFiles && imageFiles.length > 0) {
+        const visionModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
         for (const file of imageFiles) {
-          imageBuffers.push(file.buffer);
           const base64 = file.buffer.toString("base64");
-          const mimeType = file.mimetype || "image/png";
+          const mimeType = (file.mimetype || "image/png") as string;
 
           try {
-            const visionResponse = await openai.chat.completions.create({
-              model: "gpt-4o",
-              messages: [{
-                role: "user",
-                content: [
-                  { type: "text", text: "Describe this image in 2-3 sentences focusing on style, colors, mood, and key visual elements. This will be used to style-match a value proposition document." },
-                  { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } }
-                ]
-              }],
-              max_tokens: 200,
-            });
-            imageDescriptions.push(visionResponse.choices[0]?.message?.content || "No description available");
+            const visionResult = await visionModel.generateContent([
+              "Describe this image in 2-3 sentences focusing on style, colors, mood, and key visual elements. This will be used to style-match a value proposition document.",
+              { inlineData: { data: base64, mimeType } }
+            ]);
+            imageDescriptions.push(visionResult.response.text() || "No description available");
           } catch (err) {
             imageDescriptions.push("Image provided but could not be analyzed");
           }
@@ -67,16 +58,13 @@ export async function registerRoutes(
         ? `\n\nThe client provided ${imageDescriptions.length} reference image(s) with these visual characteristics:\n${imageDescriptions.map((d, i) => `Image ${i+1}: ${d}`).join("\n")}\n\nMatch the tone and energy of these visuals in your writing style.`
         : "";
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: `System Role: You are an Expert Brand Strategist, Master Copywriter, and Visual Art Director. Your goal is to distill raw conversations and visual assets into a cohesive, highly authentic brand identity.
+      const textModel = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+
+      const systemPrompt = `System Role: You are an Expert Brand Strategist, Master Copywriter, and Visual Art Director. Your goal is to distill raw conversations and visual assets into a cohesive, highly authentic brand identity.
 
 Objective:
-Analyze a provided discussion transcript and three reference images to generate two specific deliverables:
-1. A single, highly evocative "iconic image" (either generated or intricately prompted) representing the brand/product.
+Analyze a provided discussion transcript and reference images to generate two specific deliverables:
+1. A single, highly evocative "iconic image" prompt representing the brand/product.
 2. A short, impactful pitch statement conveying the core value and benefit.
 
 Step-by-Step Instructions:
@@ -103,19 +91,14 @@ The Pitch:
 
 Iconic Image Prompt:
 (Provide a highly detailed, evocative prompt that an image generator could use to create this single iconic brand image, blending the reference images and the transcript's vibe.)
+${styleContext}`;
 
-${styleContext}`
-          },
-          {
-            role: "user",
-            content: `Analyze this transcript and these visual descriptions to produce the brand package:\n\n${transcript}`
-          }
-        ],
-        max_tokens: 1500,
-      });
+      const completion = await textModel.generateContent([
+        systemPrompt,
+        `Analyze this transcript and these visual descriptions to produce the brand package:\n\n${transcript}`
+      ]);
 
-      const generatedContent = completion.choices[0]?.message?.content || "Content generation failed";
-
+      const generatedContent = completion.response.text() || "Content generation failed";
       const sections = parseBrandPackage(generatedContent);
 
       const doc = new PDFDocument({ 
@@ -169,41 +152,30 @@ ${styleContext}`
 
       if (sections.imagePrompt) {
         try {
-          console.log("Generating image with prompt:", sections.imagePrompt.split(/[.!?]/)[0]);
-          const imageResponse = await openai.images.generate({
-            model: "gpt-image-1",
-            prompt: `Highly evocative, authentic brand image: ${sections.imagePrompt.split(/[.!?]/)[0]}. Industrial, dystopian tech aesthetic, cyan accents, professional photography, studio lighting, sharp focus.`,
-            n: 1,
-            size: "1024x1024",
-          });
+          console.log("Generating image with Gemini...");
+          const imageModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash-preview-image-generation" });
 
-          const imageUrl = imageResponse.data?.[0]?.url;
-          const imageBase64 = imageResponse.data?.[0]?.b64_json;
-          
-          if (imageUrl || imageBase64) {
-            let imgBuffer: Buffer;
-            if (imageBase64) {
-              console.log("Image generated successfully (base64)");
-              imgBuffer = Buffer.from(imageBase64, 'base64');
-            } else {
-              console.log("Image generated successfully (url):", imageUrl);
-              const imgRes = await fetch(imageUrl!);
-              const arrayBuffer = await imgRes.arrayBuffer();
-              imgBuffer = Buffer.from(arrayBuffer);
+          const imageResult = await imageModel.generateContent({
+            contents: [{
+              role: "user",
+              parts: [{ text: `Highly evocative, authentic brand image: ${sections.imagePrompt.split(/[.!?]/)[0]}. Industrial, dystopian tech aesthetic, cyan accents, professional photography, studio lighting, sharp focus.` }]
+            }],
+            generationConfig: {
+              responseModalities: ["TEXT", "IMAGE"] as any,
             }
-            
-            // Fill exactly 85 percent of the bottom width while maintaining 16:9 ratio
-            const imgWidth = pageWidth * 0.85; 
+          } as any);
+
+          const parts = imageResult.response.candidates?.[0]?.content?.parts || [];
+          const imagePart = parts.find((p: any) => p.inlineData);
+
+          if (imagePart?.inlineData?.data) {
+            const imgBuffer = Buffer.from(imagePart.inlineData.data, "base64");
+
+            const imgWidth = pageWidth * 0.85;
             const imgHeight = imgWidth * (9 / 16);
 
-            // Calculate vertical center between the pitch text and the description box
-            // Pitch end: y (from pitch section)
-            // Description height: 40
-            // Footer height: ~30
-            // Available space for image + description: pageBottom - y
             const availableSpace = pageBottom - y;
-            const totalComponentHeight = imgHeight + 15 + 40; // image + gap + desc box
-            
+            const totalComponentHeight = imgHeight + 15 + 40;
             const verticalOffset = (availableSpace - totalComponentHeight) / 2;
             const imageY = y + verticalOffset;
             const xOffset = 50 + (pageWidth - imgWidth) / 2;
@@ -212,7 +184,7 @@ ${styleContext}`
               width: imgWidth,
               height: imgHeight
             });
-            
+
             const descY = imageY + imgHeight + 15;
             doc.rect(45, descY, pageWidth + 5, 40).fill("#f0fafe");
             doc.fontSize(9).fillColor("#00e5ff").font("Courier-Bold")
@@ -221,7 +193,15 @@ ${styleContext}`
               .text(sections.imagePrompt.split(/[.!?]/)[0] + ".", 58, descY + 20, { width: pageWidth - 20 });
           }
         } catch (err) {
-          console.error("DALL-E generation failed:", err);
+          console.error("Gemini image generation failed:", err);
+          // Still include the image prompt as text in the PDF
+          if (sections.imagePrompt) {
+            doc.rect(45, y, pageWidth + 5, 60).fill("#f0fafe");
+            doc.fontSize(9).fillColor("#00e5ff").font("Courier-Bold")
+              .text("ICONIC IMAGE CONCEPT", 58, y + 8);
+            doc.fontSize(10).fillColor("#444444").font("Helvetica-Oblique")
+              .text(sections.imagePrompt.split(/[.!?]/)[0] + ".", 58, y + 20, { width: pageWidth - 20 });
+          }
         }
       }
 
@@ -255,7 +235,6 @@ function parseBrandPackage(text: string): {
   };
 
   const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
-  
   let currentSection = "";
 
   for (const line of lines) {
