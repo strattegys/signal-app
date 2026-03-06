@@ -9,6 +9,7 @@ export default function KillerContentEngine() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [statusText, setStatusText] = useState("");
+  const [resultMessage, setResultMessage] = useState("");
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const transcriptInputRef = useRef<HTMLInputElement>(null);
@@ -70,11 +71,7 @@ export default function KillerContentEngine() {
       setStatusText("Building PDF...");
       const blob = await response.blob();
       setPdfBlob(blob);
-
-      toast({
-        title: "Content Generated",
-        description: "Your Killer Content PDF is ready for download.",
-      });
+      setResultMessage("Your Killer Content PDF is ready for download.");
     } catch (error: any) {
       toast({
         title: "Generation failed",
@@ -103,10 +100,17 @@ export default function KillerContentEngine() {
     setPdfBlob(null);
     setTranscriptFile(null);
     setImages([]);
+    setResultMessage("");
   };
 
   return (
     <div className="killer-engine-container relative">
+      {resultMessage && (
+        <div className="engine-result-message absolute -top-20 right-0 flex items-center gap-2 bg-cyan-500/20 border border-cyan-500/50 text-cyan-400 px-3 py-2 rounded text-xs animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-pulse" />
+          <span>{resultMessage}</span>
+        </div>
+      )}
       {pdfBlob && (
         <div className="engine-success-toast absolute -top-12 right-0 flex items-center gap-2 bg-green-500/20 border border-green-500/50 text-green-400 px-3 py-2 rounded text-xs animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
