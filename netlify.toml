@@ -1,0 +1,12 @@
+[build]
+  command = "npm run build:client"
+  publish = "dist/public"
+
+[functions]
+  node_bundler = "esbuild"
+  included_files = ["node_modules/pdfkit/**", "node_modules/fontkit/**", "node_modules/linebreak/**", "node_modules/png-js/**"]
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/generate-content"
+  status = 200
