@@ -1,0 +1,13 @@
+[build]
+  command = "npm run build:client"
+  publish = "dist/public"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+  included_files = ["node_modules/pdfkit/**/*"]
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
